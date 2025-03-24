@@ -2,8 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import './chatPage.css';
 import { FiSend, FiEdit2, FiTrash2, FiPlus, FiMoon, FiSun, FiLogOut } from 'react-icons/fi';
 import { FiThumbsUp, FiThumbsDown } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
 
-const ChatPage = () => {
+const ChatPage = ({ onLogout }) => {
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState([
     { id: 1, name: 'Chatbot definition expl', active: true }
   ]);
@@ -108,6 +110,11 @@ const ChatPage = () => {
     setDarkMode(!darkMode);
   };
 
+  const handleLogout = () => {
+    onLogout();
+    navigate('/');
+  };
+
   return (
     <div className={`chat-container ${darkMode ? 'dark' : 'light'}`}>
       {/* Sidebar */}
@@ -142,7 +149,7 @@ const ChatPage = () => {
             {darkMode ? <FiSun /> : <FiMoon />} 
             {darkMode ? 'Mode terang' : 'Mode gelap'}
           </button>
-          <button className="footer-btn">
+          <button className="footer-btn" onClick={handleLogout}>
             <FiLogOut /> Log out
           </button>
         </div>

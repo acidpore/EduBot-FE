@@ -2,20 +2,40 @@ import React, { useState } from 'react';
 import './loginPage.css';
 import { FcGoogle } from 'react-icons/fc';
 import { useNavigate } from 'react-router-dom';
+import { loginUser, registerUser } from '../../api/auth';
 
-const LoginPage = ({ onLogin }) => {
+const LoginPage = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [isLogin, setIsLogin] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Panggil fungsi onLogin yang diberikan dari App.js
-    const loginSuccess = onLogin(email, password);
-    
-    if (loginSuccess) {
-      navigate('/chat');
+    setError('');
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        // Login
+        await loginUser({ email, password });
+        onLoginSuccess();
+        navigate('/chat');
+      } else {
+        // Sign up
+        await registerUser({ name, email, password });
+        // After successful registration, switch to login
+        setIsLogin(true);
+        setError('Berhasil mendaftar! Silakan login.');
+      }
+    } catch (err) {
+      setError(err.message || 'Terjadi kesalahan. Silakan coba lagi.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -26,8 +46,13 @@ const LoginPage = ({ onLogin }) => {
   const handleGoogleLogin = () => {
     // Di sini Anda akan mengimplementasikan login dengan Google
     // Untuk contoh ini, kita hanya arahkan ke halaman chat
-    onLogin('google-user@example.com', '');
+    onLoginSuccess();
     navigate('/chat');
+  };
+
+  const toggleAuthMode = () => {
+    setIsLogin(!isLogin);
+    setError('');
   };
 
   return (
@@ -46,9 +71,25 @@ const LoginPage = ({ onLogin }) => {
           </svg>
         </div>
         
-        <h1>Selamat datang di EduBot</h1>
+        <h1>{isLogin ? 'Login ke EduBot' : 'Daftar EduBot'}</h1>
+        
+        {error && <div className="error-message">{error}</div>}
         
         <form onSubmit={handleSubmit}>
+          {!isLogin && (
+            <div className="form-group">
+              <label htmlFor="name">Nama</label>
+              <input
+                type="text"
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required={!isLogin}
+                disabled={loading}
+              />
+            </div>
+          )}
+          
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
@@ -57,6 +98,7 @@ const LoginPage = ({ onLogin }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
           
@@ -68,26 +110,36 @@ const LoginPage = ({ onLogin }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
           
-          <button type="submit" className="login-button">
-            Login
+          <button type="submit" className="login-button" disabled={loading}>
+            {loading ? 'Loading...' : isLogin ? 'Login' : 'Daftar'}
           </button>
         </form>
         
         <div className="register-link">
-          <p>Belum memiliki akun? <a href="/signup">Sign up</a></p>
+          <p>
+            {isLogin ? 'Belum memiliki akun?' : 'Sudah memiliki akun?'} 
+            <a href="#" onClick={toggleAuthMode}>
+              {isLogin ? 'Sign up' : 'Login'}
+            </a>
+          </p>
         </div>
         
-        <div className="divider">
-          <span>ATAU</span>
-        </div>
-        
-        <button className="google-login" onClick={handleGoogleLogin}>
-          <FcGoogle size={20} />
-          <span>Login dengan Google</span>
-        </button>
+        {isLogin && (
+          <>
+            <div className="divider">
+              <span>ATAU</span>
+            </div>
+            
+            <button className="google-login" onClick={handleGoogleLogin} disabled={loading}>
+              <FcGoogle size={20} />
+              <span>Login dengan Google</span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

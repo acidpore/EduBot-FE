@@ -1,17 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './components/LoginPage/loginPage';
 import ChatPage from './components/ChatPage/chatPage';
+import { isAuthenticated, logoutUser } from './api/auth';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuth, setIsAuth] = useState(false);
 
-  const handleLogin = (email, password) => {
-    // Di sini seharusnya ada logika autentikasi yang sebenarnya
-    // Untuk contoh ini, kita hanya simulasikan login berhasil
-    console.log('Login dengan:', email, password);
-    setIsAuthenticated(true);
+  useEffect(() => {
+    // Check if user is authenticated on mount
+    setIsAuth(isAuthenticated());
+  }, []);
+
+  const handleLogin = () => {
+    // Successful login will be handled in the LoginPage component
+    // Just update the auth state here
+    setIsAuth(true);
     return true;
+  };
+
+  const handleLogout = () => {
+    // Call the logout API function
+    logoutUser();
+    setIsAuth(false);
   };
 
   return (
@@ -20,16 +31,16 @@ function App() {
         <Route 
           path="/login" 
           element={
-            isAuthenticated ? 
+            isAuth ? 
               <Navigate to="/chat" /> : 
-              <LoginPage onLogin={handleLogin} />
+              <LoginPage onLoginSuccess={handleLogin} />
           } 
         />
         <Route 
           path="/chat" 
           element={
-            isAuthenticated ? 
-              <ChatPage /> : 
+            isAuth ? 
+              <ChatPage onLogout={handleLogout} /> : 
               <Navigate to="/login" />
           } 
         />

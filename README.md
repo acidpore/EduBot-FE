@@ -1,3 +1,72 @@
+# EduBot - Aplikasi Chatbot Pendidikan
+
+Aplikasi chatbot pendidikan dengan fitur login/signup terintegrasi MongoDB Atlas.
+
+## Setup Awal
+
+### Instalasi Dependensi
+
+1. Instal dependensi frontend:
+   ```
+   npm install
+   ```
+
+2. Instal dependensi backend:
+   ```
+   cd backend
+   npm install
+   ```
+
+### Konfigurasi MongoDB Atlas
+
+1. Buka file `backend/.env.local`
+2. Ganti `masukkan_password_mongodb_anda_disini` dengan password MongoDB Atlas Anda
+3. Pastikan connection string di `backend/.env` sudah benar
+
+## Menjalankan Aplikasi
+
+### Cara Mudah (Rekomendasi)
+
+Klik file `start-app.bat` untuk menjalankan frontend dan backend secara otomatis.
+
+### Cara Manual
+
+1. Jalankan backend:
+   ```
+   cd backend
+   npm run dev
+   ```
+
+2. Jalankan frontend di terminal terpisah:
+   ```
+   npm start
+   ```
+
+## Fitur Aplikasi
+
+- Login dengan email dan password
+- Signup untuk pengguna baru
+- Autentikasi menggunakan JWT
+- Toggle mode gelap/terang
+- Chatbot dengan kategori MTK dan IPA
+- Logout
+
+## Troubleshooting
+
+### Error Koneksi MongoDB
+
+Jika terjadi error koneksi ke MongoDB:
+1. Pastikan password yang dimasukkan di `.env.local` sudah benar
+2. Pastikan IP address Anda sudah diizinkan di MongoDB Atlas (Network Access)
+3. Periksa koneksi internet Anda
+
+### Error "Can't resolve 'axios'"
+
+Jalankan perintah:
+```
+npm install axios
+```
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

@@ -1,7 +1,49 @@
+/**
+ * Authentication Controller
+ * 
+ * Controller untuk menangani operasi autentikasi:
+ * - Pendaftaran pengguna baru
+ * - Login pengguna
+ * - Validasi kredensial
+ */
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
-// Register User
+/**
+ * Generate JWT token for authenticated user
+ * 
+ * @param {Object} user - User object containing id and name
+ * @returns {String} JWT token
+ */
+const generateToken = (user) => {
+  return jwt.sign(
+    { userId: user._id, name: user.name },
+    process.env.JWT_SECRET,
+    { expiresIn: '30d' }
+  );
+};
+
+/**
+ * Format user response data (removes sensitive fields)
+ * 
+ * @param {Object} user - Full user object from database
+ * @returns {Object} User object with only public fields
+ */
+const formatUserResponse = (user) => {
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email
+  };
+};
+
+/**
+ * Register a new user
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Object} Response with user data and token
+ */
 const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -19,19 +61,10 @@ const register = async (req, res) => {
       password,
     });
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id, name: user.name },
-      process.env.JWT_SECRET,
-      { expiresIn: '30d' }
-    );
-
+    // Generate token and send response
+    const token = generateToken(user);
     res.status(201).json({
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-      },
+      user: formatUserResponse(user),
       token,
     });
   } catch (error) {
@@ -39,7 +72,13 @@ const register = async (req, res) => {
   }
 };
 
-// Login User
+/**
+ * Login existing user
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Object} Response with user data and token
+ */
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -56,19 +95,10 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id, name: user.name },
-      process.env.JWT_SECRET,
-      { expiresIn: '30d' }
-    );
-
+    // Generate token and send response
+    const token = generateToken(user);
     res.status(200).json({
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-      },
+      user: formatUserResponse(user),
       token,
     });
   } catch (error) {

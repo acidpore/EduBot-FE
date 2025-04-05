@@ -1,11 +1,36 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './chatPage.css';
-import { FiSend, FiEdit2, FiTrash2, FiPlus, FiMoon, FiSun, FiLogOut } from 'react-icons/fi';
-import { FiThumbsUp, FiThumbsDown } from 'react-icons/fi';
+import { 
+  FiSend, FiEdit2, FiTrash2, FiPlus, 
+  FiMoon, FiSun, FiLogOut, 
+  FiChevronDown, FiChevronUp,
+  FiThumbsUp, FiThumbsDown 
+} from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
+import { generateResponse } from '../../api/generate';
 
+/**
+ * ChatPage Component
+ * 
+ * Komponen utama untuk halaman chat yang menangani percakapan,
+ * interaksi dengan AI, dan tampilan UI chat.
+ * 
+ * @param {Object} props - Properties yang diterima komponen
+ * @param {Function} props.onLogout - Handler saat user logout
+ */
 const ChatPage = ({ onLogout }) => {
   const navigate = useNavigate();
+  
+  // ========== State Management ==========
+  // UI States
+  const [darkMode, setDarkMode] = useState(true);
+  const [currentClass, setCurrentClass] = useState('MTK');
+  const [showSubjectMenu, setShowSubjectMenu] = useState(false);
+  const [showClassMenu, setShowClassMenu] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Content States
+  const [newMessage, setNewMessage] = useState('');
   const [conversations, setConversations] = useState([
     { id: 1, name: 'Chatbot definition expl', active: true }
   ]);
@@ -23,46 +48,144 @@ const ChatPage = ({ onLogout }) => {
       timestamp: new Date() 
     }
   ]);
-  const [newMessage, setNewMessage] = useState('');
-  const [darkMode, setDarkMode] = useState(true);
-  const [currentClass, setCurrentClass] = useState('MTK');
-  const messagesEndRef = useRef(null);
 
-  // Scroll to bottom whenever messages change
+  // Refs
+  const messagesEndRef = useRef(null);
+  const subjectRef = useRef(null);
+  const classRef = useRef(null);
+
+  // Content Data
+  const subjects = ['MTK', 'IPA', 'IPS', 'Bahasa Indonesia', 'Bahasa Inggris', 'PKN', 'Seni Budaya', 'Penjas', 'TIK'];
+  const classes = ['Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6', 'Kelas 7', 'Kelas 8', 'Kelas 9'];
+
+  // ========== Effects ==========
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
+  // Close dropdown menus when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (subjectRef.current && !subjectRef.current.contains(event.target)) {
+        setShowSubjectMenu(false);
+      }
+      
+      if (classRef.current && !classRef.current.contains(event.target)) {
+        setShowClassMenu(false);
+      }
+    }
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // ========== Helper Functions ==========
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSendMessage = (e) => {
+  // ========== Event Handlers ==========
+  /**
+   * Mengirim pesan dan mendapatkan respons dari AI
+   */
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (newMessage.trim() === '') return;
 
-    const userMessage = {
-      id: messages.length + 1,
-      type: 'user',
-      content: newMessage,
-      timestamp: new Date()
-    };
-
+    // Create and add user message
+    const userMessage = createMessage('user', newMessage);
     setMessages([...messages, userMessage]);
     setNewMessage('');
+    setIsGenerating(true);
 
-    // Simulate bot response after a short delay
-    setTimeout(() => {
-      const botMessage = {
-        id: messages.length + 2,
-        type: 'bot',
-        content: `This is a simulated response to: "${newMessage}"`,
-        timestamp: new Date()
-      };
+    try {
+      console.log('Sending message to AI:', newMessage);
+      
+      // Call the generate API with proper parameters
+      const result = await generateResponse(newMessage, {
+        max_length: 100,
+        temperature: 0.7,
+        top_p: 0.9
+      });
+      
+      console.log('Full API response from backend:', result);
+      
+      // Format and add AI response
+      const responseContent = formatResponseContent(result);
+      const botMessage = createMessage('bot', responseContent);
+      
       setMessages(prev => [...prev, botMessage]);
-    }, 1000);
+    } catch (error) {
+      console.error('Detailed error:', error);
+      
+      // Handle error and display message
+      const errorMessage = createMessage('bot', getErrorMessage(error));
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
+  /**
+   * Create a message object with standard format
+   */
+  const createMessage = (type, content) => ({
+    id: messages.length + 1,
+    type,
+    content,
+    timestamp: new Date()
+  });
+
+  /**
+   * Format response content from API
+   */
+  const formatResponseContent = (result) => {
+    let responseContent = "Sorry, I couldn't generate a response. Please try again.";
+    
+    if (result.success && result.data) {
+      responseContent = result.data;
+      console.log('Extracted response content:', responseContent);
+    } else {
+      console.warn('Result was successful but no data:', result);
+    }
+    
+    return responseContent;
+  };
+
+  /**
+   * Get appropriate error message based on error type
+   */
+  const getErrorMessage = (error) => {
+    // Log error details
+    let errorDetails = '';
+    if (error.response) {
+      errorDetails = `Status: ${error.response.status}`;
+      console.error('Response error details:', errorDetails);
+    } else if (error.request) {
+      errorDetails = 'No response received from server';
+      console.error('Request was made but no response received');
+    } else {
+      errorDetails = error.message;
+      console.error('Error setting up request:', error.message);
+    }
+    
+    // Return user-friendly error message
+    if (error.message?.includes('ECONNREFUSED')) {
+      return "The backend server isn't running. Please make sure the backend is started (see README.md for instructions).";
+    } else if (error.message?.includes('timeout')) {
+      return "The AI service took too long to respond. Please try again later.";
+    }
+    
+    return "Sorry, there was a problem connecting to the AI service.";
+  };
+
+  // ========== Chat Management ==========
+  /**
+   * Create a new chat conversation
+   */
   const handleNewChat = () => {
     const newChat = {
       id: conversations.length + 1,
@@ -80,6 +203,9 @@ const ChatPage = ({ onLogout }) => {
     setMessages([]);
   };
 
+  /**
+   * Delete a chat conversation
+   */
   const handleDeleteChat = (id, e) => {
     e.stopPropagation();
     if (conversations.length === 1) return;
@@ -94,6 +220,9 @@ const ChatPage = ({ onLogout }) => {
     setConversations(updatedConversations);
   };
 
+  /**
+   * Select a chat conversation
+   */
   const handleSelectChat = (id) => {
     const updatedConversations = conversations.map(conv => ({
       ...conv,
@@ -106,6 +235,7 @@ const ChatPage = ({ onLogout }) => {
     // For this demo, we'll just keep the current messages
   };
 
+  // ========== UI Controls ==========
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
   };
@@ -115,6 +245,27 @@ const ChatPage = ({ onLogout }) => {
     navigate('/');
   };
 
+  const toggleSubjectMenu = () => {
+    setShowSubjectMenu(!showSubjectMenu);
+    if (showClassMenu) setShowClassMenu(false);
+  };
+
+  const toggleClassMenu = () => {
+    setShowClassMenu(!showClassMenu);
+    if (showSubjectMenu) setShowSubjectMenu(false);
+  };
+
+  const selectSubject = (subject) => {
+    setCurrentClass(subject);
+    setShowSubjectMenu(false);
+  };
+
+  const selectClass = (className) => {
+    setShowClassMenu(false);
+    // Lakukan logika lain yang diperlukan saat kelas dipilih
+  };
+
+  // ========== Render UI ==========
   return (
     <div className={`chat-container ${darkMode ? 'dark' : 'light'}`}>
       {/* Sidebar */}
@@ -159,70 +310,88 @@ const ChatPage = ({ onLogout }) => {
       <div className="chat-area">
         {/* Header */}
         <div className="chat-header">
-          <div className="course-tabs">
-            <div className={`tab ${currentClass === 'MTK' ? 'active' : ''}`} onClick={() => setCurrentClass('MTK')}>
-              MTK
+          <div className="subject-selector" ref={subjectRef}>
+            <div className="subject-dropdown" onClick={toggleSubjectMenu}>
+              <span>{currentClass}</span>
+              {showSubjectMenu ? <FiChevronUp /> : <FiChevronDown />}
             </div>
-            <div className={`tab ${currentClass === 'IPA' ? 'active' : ''}`} onClick={() => setCurrentClass('IPA')}>
-              IPA
-            </div>
+            {showSubjectMenu && (
+              <div className="subject-menu">
+                {subjects.map((subject, index) => (
+                  <div 
+                    key={index} 
+                    className={`subject-item ${currentClass === subject ? 'active' : ''}`}
+                    onClick={() => selectSubject(subject)}
+                  >
+                    {subject}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="class-selector">
-            <select>
-              <option>Pilih Kelas</option>
-              <option>Kelas 10</option>
-              <option>Kelas 11</option>
-              <option>Kelas 12</option>
-            </select>
+          
+          <div className="class-selector" ref={classRef}>
+            <div className="class-dropdown" onClick={toggleClassMenu}>
+              <span>Pilih Kelas</span>
+              {showClassMenu ? <FiChevronUp /> : <FiChevronDown />}
+            </div>
+            {showClassMenu && (
+              <div className="class-menu">
+                {classes.map((className, index) => (
+                  <div 
+                    key={index} 
+                    className="class-item"
+                    onClick={() => selectClass(className)}
+                  >
+                    {className}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Messages */}
-        <div className="messages-container">
+        <div className="chat-messages">
           {messages.map(message => (
             <div key={message.id} className={`message ${message.type}`}>
-              <div className="message-avatar">
-                {message.type === 'user' ? 
-                  <div className="user-avatar">👤</div> :
-                  <div className="bot-avatar">📚</div>
-                }
+              <div className="message-content">{message.content}</div>
+              <div className="message-timestamp">
+                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
-              <div className="message-content">
-                <div className="message-text">{message.content}</div>
-                {message.type === 'bot' && (
-                  <div className="message-actions">
-                    <button className="action-btn">
-                      <FiThumbsUp />
-                    </button>
-                    <button className="action-btn">
-                      <FiThumbsDown />
-                    </button>
-                  </div>
-                )}
-              </div>
+              {message.type === 'bot' && (
+                <div className="message-actions">
+                  <button className="action-btn like-btn" title="Like">
+                    <FiThumbsUp size={16} />
+                  </button>
+                  <button className="action-btn dislike-btn" title="Dislike">
+                    <FiThumbsDown size={16} />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
+          {isGenerating && (
+            <div className="message bot generating">
+              <div className="message-content">Generating response...</div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
-        <div className="input-container">
-          <button className="regenerate-btn">
-            Buat ulang respons
+        <form className="chat-input" onSubmit={handleSendMessage}>
+          <input
+            type="text"
+            placeholder="Ketik pesan..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            disabled={isGenerating}
+          />
+          <button type="submit" className="send-btn" disabled={isGenerating}>
+            <FiSend />
           </button>
-          <form onSubmit={handleSendMessage} className="message-form">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Ketik pesan..."
-              className="message-input"
-            />
-            <button type="submit" className="send-btn">
-              <FiSend />
-            </button>
-          </form>
-        </div>
+        </form>
       </div>
     </div>
   );

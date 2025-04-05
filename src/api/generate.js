@@ -17,11 +17,12 @@ const DEFAULT_PARAMS = {
 // API configuration
 const API_URLS = {
   backend: '/api',
-  direct: 'https://kwir03xxq01508-8000.proxy.runpod.net'
+  direct: '/api/generate'  // Gunakan Vercel Serverless Function
 };
 
-// Runtime state
-let useDirectAPI = false;
+// Runtime state - ubah ke true untuk selalu gunakan API langsung
+// dalam deployment, backend tidak tersedia
+let useDirectAPI = true; // Default menggunakan direct API untuk deployment
 
 /**
  * Format request data based on target API

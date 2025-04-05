@@ -17,14 +17,11 @@ const DEFAULT_PARAMS = {
 // API configuration
 const API_URLS = {
   backend: '/api',
-  direct: '/api/generate'  // Gunakan Vercel Serverless Function
+  direct: 'https://kwir03xxq01508-8000.proxy.runpod.net'
 };
 
-// Runtime state - ubah ke true untuk selalu gunakan API langsung
-// dalam deployment, backend tidak tersedia
-let useDirectAPI = true; // Default menggunakan direct API untuk deployment
-let retryCount = 0;
-const MAX_RETRIES = 1;
+// Runtime state
+let useDirectAPI = false;
 
 /**
  * Format request data based on target API
@@ -35,11 +32,16 @@ const MAX_RETRIES = 1;
  * @returns {Object} - Formatted request data
  */
 const formatRequestData = (prompt, parameters, isDirectAPI) => {
-  // Format sama untuk keduanya karena vercel function sudah disesuaikan
-  return {
-    prompt,
-    parameters
-  };
+  if (isDirectAPI) {
+    return {
+      prompt,
+      max_length: parameters.max_length || DEFAULT_PARAMS.max_length,
+      temperature: parameters.temperature || DEFAULT_PARAMS.temperature,
+      top_p: parameters.top_p || DEFAULT_PARAMS.top_p
+    };
+  }
+  
+  return { prompt, parameters };
 };
 
 /**
@@ -50,23 +52,16 @@ const formatRequestData = (prompt, parameters, isDirectAPI) => {
  * @returns {Object} - Formatted response object
  */
 const formatResponseData = (responseData, isDirectAPI) => {
-  // Extract response data with error handling
-  try {
-    // Validasi struktur response
-    if (!responseData) {
-      throw new Error('Empty response received');
-    }
-
-    // Kembalikan seperti apa adanya, karena vercel function sudah
-    // mengembalikan format yang benar { success: true, data: "content" }
-    return responseData;
-  } catch (error) {
-    console.error('Error formatting response:', error);
+  if (isDirectAPI) {
+    // Direct API returns {response: "text"}
     return {
       success: true,
-      data: 'Error formatting response: ' + error.message
+      data: responseData.response
     };
   }
+  
+  // Backend returns {success: true, data: "text"}
+  return responseData;
 };
 
 /**
@@ -78,18 +73,15 @@ const formatResponseData = (responseData, isDirectAPI) => {
  */
 export const generateResponse = async (prompt, parameters = {}) => {
   try {
-    // Reset retry count
-    retryCount = 0;
-    
-    // Determine API target - selalu gunakan direct API di deployment
+    // Determine API target
     const baseURL = useDirectAPI ? API_URLS.direct : API_URLS.backend;
-    const endpoint = '';
+    const endpoint = useDirectAPI ? '/generate/' : '/generate';
     
     // Log request details
     console.log(`Sending request to ${baseURL}${endpoint} (${useDirectAPI ? 'direct' : 'via backend'}):`, 
       { prompt, parameters });
     
-    // Format request data
+    // Format request data based on target
     const requestData = formatRequestData(prompt, parameters, useDirectAPI);
     
     // Send request
@@ -125,26 +117,19 @@ export const generateResponse = async (prompt, parameters = {}) => {
  */
 const handleRequestError = async (error, prompt, parameters) => {
   console.error('Request failed:', error.message);
-  logDetailedError(error);
   
-  // If retries are exhausted, return a mock response
-  if (retryCount >= MAX_RETRIES) {
-    console.log('All retry attempts failed. Returning mock response.');
-    return {
-      success: true,
-      data: `Maaf, layanan AI tidak dapat diakses saat ini. Silakan coba lagi nanti. (Error: ${error.message})`
-    };
+  // Try fallback to direct API if backend connection failed
+  if (!useDirectAPI && (error.message.includes('ECONNREFUSED') || error.message.includes('Network Error'))) {
+    console.log('Backend connection failed, switching to direct API...');
+    useDirectAPI = true;
+    return generateResponse(prompt, parameters);
   }
   
-  // Increment retry counter
-  retryCount++;
-  console.log(`Retry attempt ${retryCount}/${MAX_RETRIES}...`);
+  // Log detailed error information
+  logDetailedError(error);
   
-  // Add delay before retry
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Retry 
-  return generateResponse(prompt, parameters);
+  // Re-throw the error for caller to handle
+  throw error;
 };
 
 /**
@@ -158,14 +143,11 @@ const logDetailedError = (error) => {
       status: error.response.status,
       data: error.response.data
     });
-    console.log('Response error details: Status:', error.response.status);
   } else if (error.request) {
     console.error('No response received from server');
   } else {
     console.error('Error setting up request:', error.message);
   }
-  
-  console.error('Detailed error:', error.name || 'unknown');
 };
 
 // Export as named export and default object for flexibility
